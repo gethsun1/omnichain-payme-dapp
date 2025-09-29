@@ -1,15 +1,36 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// ZetaChain protocol contracts (to be installed in contracts package.json):
-// import "@zetachain/protocol-contracts/contracts/zevm/SystemContract.sol";
-// import "@zetachain/protocol-contracts/contracts/zevm/interfaces/IZRC20.sol";
+// Minimal interfaces for ZetaChain Athens SystemContract and ZRC20 (to avoid adding deps now)
+interface IZRC20Like {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+    function decimals() external view returns (uint8);
+}
+
+interface ISystemContractLike {
+    struct RevertOptions {
+        address revertAddress;
+        bytes revertMessage;
+    }
+
+    function withdraw(
+        bytes calldata receiver,
+        uint256 amount,
+        address zrc20,
+        RevertOptions calldata revertOptions
+    ) external;
+}
 
 /**
  * Omnichain-capable payment manager. Emits request/fulfilled events and
  * will integrate ZetaChain omnichain settlement for cross-chain payments.
  */
 contract PaymentManager {
+    // Zeta Athens SystemContract on ZEVM
+    address public immutable systemContract;
+
     struct PaymentRequest {
         address requester;
         uint256 amount;
@@ -32,6 +53,11 @@ contract PaymentManager {
         address token,
         uint256 amount
     );
+
+    constructor(address _systemContract) {
+        require(_systemContract != address(0), "invalid system");
+        systemContract = _systemContract;
+    }
 
     function createRequest(
         uint256 _amount,
@@ -73,9 +99,23 @@ contract PaymentManager {
             (bool sent, ) = payable(req.requester).call{value: msg.value}("");
             require(sent, "Transfer failed");
         } else {
-            // Accept as a signal only; in production integrate ERC20 transfer + ZetaConnector
+            // ZRC-20 path on Athens: pull ZRC-20 from payer to this contract,
+            // approve SystemContract, and withdraw to requester on destination (ZEVM or external chain via gateway).
             require(_token == req.token, "Token mismatch");
             require(_amount == req.amount, "Incorrect token amount");
+
+            // Transfer ZRC20 into this contract
+            require(IZRC20Like(_token).transferFrom(msg.sender, address(this), _amount), "zrc20 transferFrom failed");
+            // Approve SystemContract to withdraw
+            require(IZRC20Like(_token).approve(systemContract, _amount), "approve failed");
+
+            // Encode EVM address as bytes for receiver
+            bytes memory receiver = abi.encodePacked(req.requester);
+            ISystemContractLike.RevertOptions memory ro = ISystemContractLike.RevertOptions({
+                revertAddress: msg.sender,
+                revertMessage: "withdraw revert"
+            });
+            ISystemContractLike(systemContract).withdraw(receiver, _amount, _token, ro);
         }
 
         req.fulfilled = true;
