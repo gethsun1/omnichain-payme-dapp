@@ -13,7 +13,8 @@ An omnichain payment request flow:
 
 Status
 - Contracts: `PaymentManager` with events and basic native/ERC20 fulfillment. ZetaChain settlement stubs pending.
-- Frontend: To be scaffolded (Create, Pay, Dashboard)
+- Deployed (Zeta Athens): `0xF45aa7AE79a8E8C86728B4fe4aC945F388699Ade`
+- Frontend: Scaffolded (Create, Pay, Dashboard) with wallet connect and basic calls
 - Docs: This README and a diagram placeholder added
 
 Quick Start
@@ -30,6 +31,21 @@ Deploy to Zeta Athens Testnet:
 ```bash
 npx hardhat run scripts/deploy.js --network zetachain_testnet
 ```
+
+Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Usage
+- Create Request:
+  - Open `/create`, connect wallet, enter amount, keep token as zero address for native flow, submit.
+- Pay Request:
+  - Open `/pay/:id`, enter amount, click Pay Now (native ETH path currently).
+- Dashboard: (stub) `/dashboard`.
 
 Frontend (planned)
 - Vite + React + wagmi/viem
