@@ -10,18 +10,20 @@ export function Create() {
 	const [requestId, setRequestId] = useState<string | null>(null)
 	const [qr, setQr] = useState<string | null>(null)
 	const [loading, setLoading] = useState(false)
-	const { createRequest } = usePaymentManager()
+	const { createRequest, waitForReceipt, getRequestCount } = usePaymentManager()
 
 	async function onSubmit(e: React.FormEvent) {
 		e.preventDefault()
 		setLoading(true)
 		try {
-			const txHash = await createRequest(parseEther(amount), token as `0x${string}`)
-			// naive: read current requestCount after tx mined; for now, assume increment and reload
-			const link = `${window.location.origin}/pay/last` // placeholder; user can use dashboard
+			const hash = await createRequest(parseEther(amount), token as `0x${string}`)
+			await waitForReceipt(hash)
+			const count = await getRequestCount()
+			const id = count.toString()
+			setRequestId(id)
+			const link = `${window.location.origin}/pay/${id}`
 			const dataUrl = await QRCode.toDataURL(link)
 			setQr(dataUrl)
-			setRequestId('created')
 		} catch (e) {
 			console.error(e)
 		} finally {
@@ -45,7 +47,8 @@ export function Create() {
 			</form>
 			{requestId && (
 				<div style={{ marginTop: 16 }}>
-					<div>Request created.</div>
+					<div>Request ID: {requestId}</div>
+					<div>Link: <a href={`/pay/${requestId}`}>{window.location.origin}/pay/{requestId}</a></div>
 					{qr && <img src={qr} alt="QR" style={{ width: 200 }} />}
 				</div>
 			)}
