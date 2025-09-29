@@ -1,10 +1,10 @@
 import React from 'react'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { InjectedConnector } from 'wagmi/connectors/injected'
+import { injected } from 'wagmi/connectors'
 
 export function WalletButton() {
 	const { address, isConnected } = useAccount()
-	const { connect, isPending } = useConnect({ connector: new InjectedConnector() })
+	const { connect, isPending } = useConnect({ connector: injected() })
 	const { disconnect } = useDisconnect()
 
 	if (!isConnected) return <button onClick={() => connect()} disabled={isPending}>Connect Wallet</button>
